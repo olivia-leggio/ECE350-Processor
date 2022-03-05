@@ -1,0 +1,1 @@
+Accidentally taking the ALU op directly from the instruction for addi instead of setting it to 00000. Result is ALU op continually incrementing and some values happen to be correct. Very funny yes
