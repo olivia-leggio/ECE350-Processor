@@ -158,16 +158,12 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ X Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        wire sub_ctrl, ALU_B_ctrl, op_ctrl;
-        decode_X decode_x(sub_ctrl, ALU_B_ctrl, op_ctrl, op_X, ALU_X);
+        wire ALU_B_ctrl, op_ctrl;
+        decode_X decode_x(ALU_B_ctrl, op_ctrl, op_X, ALU_X);
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ALU ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        wire [31:0] inverted_B, chosen_sub_B;
-
-        not32 inverter(inverted_B, B_fromD);
-        assign chosen_sub_B = sub_ctrl ? inverted_B : B_fromD;
-        assign into_ALU_B = ALU_B_ctrl ? imm_X : chosen_sub_B;
+        assign into_ALU_B = ALU_B_ctrl ? imm_X : B_fromD;
 
         wire INE, ILT, OVF;
         wire [4:0] into_ALU_op;
