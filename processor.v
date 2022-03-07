@@ -151,7 +151,7 @@ module processor(
         wire [26:0] targ_X;
 
         wire[31:0] A_fromD, B_fromD;
-        wire[31:0] into_ALU_B;
+        wire[31:0] into_ALU_A, into_ALU_B;
         wire[31:0] ALU_out;
 
         instr_split split_X(op_X, rd_X, rs_X, rt_X, shamt_X, ALU_X, imm_X, targ_X, instr_X);
@@ -163,13 +163,27 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ALU ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        assign into_ALU_B = ALU_B_ctrl ? imm_X : B_fromD;
+
+        //ALU A bypassing
+        wire [1:0] ALU_A_select;
+        assign ALU_A_select[0] = (rs_X == rd_W);
+        assign ALU_A_select[1] = (rs_X == rd_M);
+        mux4 A_bypass(into_ALU_A, A_fromD, writeback, O_fromX, O_fromX, ALU_A_select);
+        //ALU B bypassing
+        wire [31:0] ALU_B_bypassed;
+        wire [1:0] ALU_B_select;
+        assign ALU_B_select[0] = (rt_X == rd_W);
+        assign ALU_B_select[1] = (rt_X == rd_M);
+        mux4 B_bypass(ALU_B_bypassed, B_fromD, writeback, O_fromX, O_fromX, ALU_B_select);
+
+
+        assign into_ALU_B = ALU_B_ctrl ? imm_X : ALU_B_bypassed;
 
         wire INE, ILT, OVF;
         wire [4:0] into_ALU_op;
 
         assign into_ALU_op = op_ctrl ? 5'b00000 : ALU_X;
-        alu ALU(A_fromD, into_ALU_B, into_ALU_op, shamt_X, ALU_out, INE, ILT, OVF);
+        alu ALU(into_ALU_A, into_ALU_B, into_ALU_op, shamt_X, ALU_out, INE, ILT, OVF);
 
 
 
@@ -194,7 +208,11 @@ module processor(
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ M Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         assign wren = (op_M == 5'b00111);
         assign address_dmem = O_fromX;
-        assign data = B_fromX;
+
+        //data bypassing
+        wire data_select;
+        assign data_select = (rd_W == rd_M);
+        assign data = data_select ? writeback : B_fromX;
 
 
 
