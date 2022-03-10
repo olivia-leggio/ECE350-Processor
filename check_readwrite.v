@@ -1,6 +1,6 @@
-module check_readwrite(A_reads_rs, B_reads_rt, B_reads_rd, M_writes_rd, W_writes_rd, op_X, op_M, op_W);
+module check_readwrite(A_reads_rs, B_reads_rt, B_reads_rd, M_writes_rd, W_writes_rd, M_nonzero, W_nonzero, op_X, op_M, op_W);
     input [4:0] op_X, op_M, op_W;
-    output A_reads_rs, B_reads_rt, B_reads_rd, M_writes_rd, W_writes_rd;
+    output A_reads_rs, B_reads_rt, B_reads_rd, M_writes_rd, W_writes_rd, M_nonzero, W_nonzero;
 
     wire xs0, xs1, xs2, xs3, xs4;
     wire m0, m1, m2, m3, m4;
@@ -42,5 +42,9 @@ module check_readwrite(A_reads_rs, B_reads_rt, B_reads_rd, M_writes_rd, W_writes
 
     assign W_writes_rd = (~w4 & ~w2 & ~w1 & ~w0) | //00000 or 01000
                          (~w4 & ~w3 &  w2 & ~w1 &  w0); //00101 addi
+
+
+    assign M_nonzero = (m4 | m3 | m2 | m1 | m0);
+    assign W_nonzero = (w4 | w3 | w2 | w1 | w0);
 
 endmodule

@@ -240,25 +240,27 @@ module processor(
         wire B_reads_rd;
         wire M_writes_rd;
         wire W_writes_rd;
+        wire M_nonzero;
+        wire W_nonzero;
 
-        check_readwrite checks_rw(A_reads_rs, B_reads_rt, B_reads_rd, M_writes_rd, W_writes_rd, op_X, op_M, op_W);
+        check_readwrite checks_rw(A_reads_rs, B_reads_rt, B_reads_rd, M_writes_rd, W_writes_rd, M_nonzero, W_nonzero, op_X, op_M, op_W);
 
 
         //ALU A bypassing
         wire [1:0] ALU_A_select;
-        assign ALU_A_select[0] = (rs_X == rd_W) & A_reads_rs & W_writes_rd;
-        assign ALU_A_select[1] = (rs_X == rd_M) & A_reads_rs & M_writes_rd;
+        assign ALU_A_select[0] = (rs_X == rd_W) & A_reads_rs & W_writes_rd & W_nonzero;
+        assign ALU_A_select[1] = (rs_X == rd_M) & A_reads_rs & M_writes_rd & M_nonzero;
         mux4 A_bypass(into_ALU_A, A_fromD, writeback, O_fromX, O_fromX, ALU_A_select);
         //ALU B bypassing
         wire [31:0] ALU_B_bypassed;
         wire [1:0] ALU_B_select;
-        assign ALU_B_select[0] = (((rt_X == rd_W) & B_reads_rt) | ((rd_X == rd_W) & B_reads_rd)) & W_writes_rd;
-        assign ALU_B_select[1] = (((rt_X == rd_M) & B_reads_rt) | ((rd_X == rd_M) & B_reads_rd)) & M_writes_rd;
+        assign ALU_B_select[0] = (((rt_X == rd_W) & B_reads_rt) | ((rd_X == rd_W) & B_reads_rd)) & W_writes_rd & W_nonzero;
+        assign ALU_B_select[1] = (((rt_X == rd_M) & B_reads_rt) | ((rd_X == rd_M) & B_reads_rd)) & M_writes_rd & M_nonzero;
         mux4 B_bypass(ALU_B_bypassed, B_fromD, writeback, O_fromX, O_fromX, ALU_B_select);
 
         //data bypassing
         wire data_select;
-        assign data_select = (rd_W == rd_M) & M_writes_rd;
+        assign data_select = (rd_W == rd_M) & W_writes_rd & W_nonzero;
         assign data = data_select ? writeback : B_fromX;
         
 
