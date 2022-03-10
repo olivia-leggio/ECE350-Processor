@@ -95,7 +95,7 @@ module processor(
         adder32 PCplusOne(new_PC, INE_F, ILT_F, OVF_F, PC_F, 32'b00000000000000000000000000000001, 1'b0);
         
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ PC Register ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        one_register pc_reg(PC_F, new_PC, clock, reset, 1'b1);
+        one_register pc_reg(PC_F, new_PC, clock, reset, PC_en);
 
         //into imem
         assign address_imem = PC_F;
@@ -105,7 +105,7 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~FD Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        FD_latch fd_latch(PC_D, instr_D, PC_F, q_imem, ~clock, reset);
+        FD_latch fd_latch(PC_D, instr_D, PC_F, q_imem, ~clock, reset, FD_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- D STAGE --------------------------------------------//
@@ -135,12 +135,16 @@ module processor(
         wire ctrl_readB;
         decode_D decode_d(ctrl_readB, op_D);
 
+        //stall NOP insert
+        wire [31:0] instr_into_DX;
+        assign instr_into_DX = ctrl_DX_instr ? 32'b0 : instr_D;
+
 
 
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~DX Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        DX_latch dx_latch(PC_X, instr_X, A_fromD, B_fromD, PC_D, instr_D, A_read, B_read, ~clock, reset);
+        DX_latch dx_latch(PC_X, instr_X, A_fromD, B_fromD, PC_D, instr_into_DX, A_read, B_read, ~clock, reset, DX_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- X STAGE --------------------------------------------//
@@ -190,7 +194,7 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~XM Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        XM_latch xm_latch(instr_M, O_fromX, B_fromX, instr_X, ALU_out, B_fromD, ~clock, reset);
+        XM_latch xm_latch(instr_M, O_fromX, B_fromX, instr_X, ALU_out, B_fromD, ~clock, reset, XM_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- M STAGE --------------------------------------------//
@@ -220,7 +224,7 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~MW Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        MW_latch mw_latch(instr_W, O_fromM, D_fromM, instr_M, O_fromX, q_dmem, ~clock, reset);
+        MW_latch mw_latch(instr_W, O_fromM, D_fromM, instr_M, O_fromX, q_dmem, ~clock, reset, MW_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- W STAGE --------------------------------------------//
@@ -241,6 +245,23 @@ module processor(
         decode_W decode_w(ctrl_writeEnable, ctrl_writeback, op_W);
 
         assign writeback[31:0] = ctrl_writeback ? D_fromM : O_fromM;
+
+
+
+
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+    //------------------------------------------ STALL LOGIC ------------------------------------------//
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+        wire PC_en, FD_en, DX_en, XM_en, MW_en;
+        wire ctrl_DX_instr;
+
+        normal_stall staller(PC_en, FD_en, ctrl_DX_instr, op_X, op_D, rs_D, rt_D, rd_X);
+
+        //temp, remove when multdiv stall implemented
+        assign DX_en = 1'b1;
+        assign XM_en = 1'b1;
+        assign MW_en = 1'b1;
 
 	/* END CODE */
 

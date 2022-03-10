@@ -41,3 +41,5 @@
 ./ALU/sll.v
 ./ALU/and32.v
 ./MW_latch.v
+./normal_stall.v
+./multdiv_stall.v
