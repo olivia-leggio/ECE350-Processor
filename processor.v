@@ -243,7 +243,10 @@ module processor(
         wire M_nonzero;
         wire W_nonzero;
 
-        check_readwrite checks_rw(A_reads_rs, B_reads_rt, B_reads_rd, M_writes_rd, W_writes_rd, M_nonzero, W_nonzero, op_X, op_M, op_W);
+        check_readwrite checks_rw(A_reads_rs, B_reads_rt, B_reads_rd, M_writes_rd, W_writes_rd, op_X, op_M, op_W);
+
+        assign M_nonzero = (rd_M[4] | rd_M[3] | rd_M[2] | rd_M[1] | rd_M[0]);
+        assign W_nonzero = (rd_W[4] | rd_W[3] | rd_W[2] | rd_W[1] | rd_W[0]);
 
 
         //ALU A bypassing
