@@ -186,6 +186,7 @@ module processor(
         tristate32 mdA(md_A, into_ALU_A, is_multdiv);
         tristate32 mdB(md_B, ALU_B_bypassed, is_multdiv);
         //store previous enable to ensure multdiv ctrl on for one cycle only
+        wire ctrl_mult, ctrl_div, prev_enable;
         dffe_ref prev_en(prev_enable, DX_en, ~clock, 1'b1, 1'b0);
         assign ctrl_mult = prev_enable & is_mult;
         assign ctrl_div = prev_enable & is_div;
