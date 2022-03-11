@@ -95,7 +95,7 @@ module processor(
         adder32 PCplusOne(new_PC, INE_F, ILT_F, OVF_F, PC_F, 32'b00000000000000000000000000000001, 1'b0);
         
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ PC Register ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        one_register pc_reg(PC_F, new_PC, clock, reset, PC_en);
+        one_register pc_reg(PC_F, new_PC, ~clock, reset, PC_en);
 
         //into imem
         assign address_imem = PC_F;
@@ -185,12 +185,16 @@ module processor(
         wire [31:0] md_A, md_B;
         tristate32 mdA(md_A, into_ALU_A, is_multdiv);
         tristate32 mdB(md_B, ALU_B_bypassed, is_multdiv);
+        //store previous enable to ensure multdiv ctrl on for one cycle only
+        dffe_ref prev_en(prev_enable, DX_en, ~clock, 1'b1, 1'b0);
+        assign ctrl_mult = prev_enable & is_mult;
+        assign ctrl_div = prev_enable & is_div;
 
         //multdiv outputs
         wire multdiv_exception, multdiv_RDY;
         wire [31:0] multdiv_result;
 
-        multdiv multiplierdivider(md_A, md_B, is_mult, is_div, clock, multdiv_result, multdiv_exception, multdiv_RDY);
+        multdiv multiplierdivider(md_A, md_B, ctrl_mult, ctrl_div, clock, multdiv_result, multdiv_exception, multdiv_RDY);
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~ X STAGE OUTPUT ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
