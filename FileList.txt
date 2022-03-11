@@ -42,5 +42,4 @@
 ./ALU/and32.v
 ./MW_latch.v
 ./normal_stall.v
-./multdiv_stall.v
 ./check_readwrite.v

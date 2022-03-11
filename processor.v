@@ -162,8 +162,8 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ X Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        wire ALU_B_ctrl, op_ctrl;
-        decode_X decode_x(ALU_B_ctrl, op_ctrl, op_X, ALU_X);
+        wire ALU_B_ctrl, op_ctrl, is_mult, is_div;
+        decode_X decode_x(ALU_B_ctrl, op_ctrl, is_mult, is_div, op_X, ALU_X);
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ALU ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
@@ -174,13 +174,36 @@ module processor(
 
         assign into_ALU_op = op_ctrl ? 5'b00000 : ALU_X;
         alu ALU(into_ALU_A, into_ALU_B, into_ALU_op, shamt_X, ALU_out, INE, ILT, OVF);
+        
+
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ MULTDIV ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+        wire is_multdiv;
+        or multdiver(is_multdiv, is_mult, is_div);
+
+        //multdiv inputs
+        wire [31:0] md_A, md_B;
+        tristate32 mdA(md_A, into_ALU_A, is_multdiv);
+        tristate32 mdB(md_B, ALU_B_bypassed, is_multdiv);
+
+        //multdiv outputs
+        wire multdiv_exception, multdiv_RDY;
+        wire [31:0] multdiv_result;
+
+        multdiv multiplierdivider(md_A, md_B, is_mult, is_div, clock, multdiv_result, multdiv_exception, multdiv_RDY);
+
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~ X STAGE OUTPUT ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+        wire [31:0] X_out;
+
+        assign X_out = is_multdiv ? multdiv_result : ALU_out;
 
 
 
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~XM Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        XM_latch xm_latch(instr_M, O_fromX, B_fromX, instr_X, ALU_out, B_fromD, ~clock, reset, XM_en);
+        XM_latch xm_latch(instr_M, O_fromX, B_fromX, instr_X, X_out, B_fromD, ~clock, reset, XM_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- M STAGE --------------------------------------------//
@@ -271,15 +294,27 @@ module processor(
 
         
         //-----------STALL-------------
+        //load/addi stall
         wire PC_en, FD_en, DX_en, XM_en, MW_en;
         wire ctrl_DX_instr;
 
         normal_stall staller(PC_en, FD_en, ctrl_DX_instr, op_X, op_D, rs_D, rt_D, rd_X);
 
+        //multdiv stall
+        wire multdiv_stall;
+        dffe_ref md_storer(multdiv_stall, is_multdiv, clock, 1'b1, multdiv_RDY);
+
+        assign PC_en = ~multdiv_stall;
+        assign FD_en = ~multdiv_stall;
+        assign DX_en = ~multdiv_stall;
+        assign XM_en = ~multdiv_stall;
+        assign MW_en = ~multdiv_stall;
+
+
         //temp, remove when multdiv stall implemented
-        assign DX_en = 1'b1;
-        assign XM_en = 1'b1;
-        assign MW_en = 1'b1;
+        //assign DX_en = 1'b1;
+        //assign XM_en = 1'b1;
+        //assign MW_en = 1'b1;
 
 	/* END CODE */
 
