@@ -167,7 +167,7 @@ module adder32(S, isNotEqual, isLessThan, overflow, A, B, Cin);
 //~~~~~~~~~~~~~~~~~~~~~~~~extra bits~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
     //overflow
-    wire negA, negB, negS;
+    wire negA, negB, negS, ovfand1, ovfand2;
     not negAA(negA, A[31]);
     not negBB(negB, B[31]);
     not negSS(negS, S[31]);

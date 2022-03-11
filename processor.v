@@ -121,7 +121,7 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~Data into Regfile~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        assign ctrl_writeReg[4:0] = rd_W[4:0];
+        assign ctrl_writeReg[4:0] = ctrl_setx ? 5'b11110 : rd_W[4:0];
         assign ctrl_readRegA[4:0] = rs_D[4:0];
         //mux to choose between rt and rd
         assign ctrl_readRegB[4:0] = ctrl_readB ? rd_D[4:0] : rt_D[4:0];
@@ -244,16 +244,20 @@ module processor(
         wire [26:0] targ_W;
 
         wire[31:0] O_fromM, D_fromM;
-        wire [31:0] writeback;
-        wire ctrl_writeback;
+        wire [31:0] writeback, arith_writeback, ext_targ_W;
+        wire ctrl_writeback, ctrl_setx;
 
         instr_split split_W(op_W, rd_W, rs_W, rt_W, shamt_W, ALU_W, imm_W, targ_W, instr_W);
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ W Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        decode_W decode_w(ctrl_writeEnable, ctrl_writeback, op_W);
+        decode_W decode_w(ctrl_writeEnable, ctrl_writeback, ctrl_setx, op_W);
 
-        assign writeback[31:0] = ctrl_writeback ? D_fromM : O_fromM;
+        assign ext_targ_W[26:0] = targ_W[26:0];
+        assign ext_targ_W[31:27] = 5'b00000;
+
+        assign arith_writeback[31:0] = ctrl_writeback ? D_fromM : O_fromM;
+        assign writeback[31:0] = ctrl_setx ? ext_targ_W : arith_writeback;
 
 
 
