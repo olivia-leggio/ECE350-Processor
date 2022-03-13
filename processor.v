@@ -87,18 +87,35 @@ module processor(
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
         wire [31:0] PC_F;
+        wire [31:0] PC_plus_one;
+        wire [31:0] ext_PC;
         wire [31:0] new_PC;
+
+
+        assign ext_PC[26:0] = targ_W[26:0];
+        assign ext_PC[31:27] = 5'b00000;
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Adder ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         wire INE_F, ILT_F, OVF_F;
-        adder32 PCplusOne(new_PC, INE_F, ILT_F, OVF_F, PC_F, 32'b00000000000000000000000000000001, 1'b0);
+        adder32 PCplusOne(PC_plus_one, INE_F, ILT_F, OVF_F, PC_F, 32'b00000000000000000000000000000001, 1'b0);
         
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ PC Register ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+        assign new_PC = ctrl_j ? ext_PC : PC_plus_one;
         one_register pc_reg(PC_F, new_PC, ~clock, reset, PC_en);
 
         //into imem
         assign address_imem = PC_F;
+
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ F Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+        wire control_clear, clear, ctrl_j;
+        decode_F decode_f(ctrl_j, op_W);
+
+        //stores last W stage instr: clears latches one cycle later
+        //clear sent to DX, XM, and MW latches
+        dffe_ref delayed_clear(control_clear, ctrl_j, ~clock, 1'b1, 1'b0);
+        assign clear = (reset | control_clear);
 
 
 
@@ -144,7 +161,7 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~DX Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        DX_latch dx_latch(PC_X, instr_X, A_fromD, B_fromD, PC_D, instr_into_DX, A_read, B_read, ~clock, reset, DX_en);
+        DX_latch dx_latch(PC_X, instr_X, A_fromD, B_fromD, PC_D, instr_into_DX, A_read, B_read, ~clock, clear, DX_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- X STAGE --------------------------------------------//
@@ -208,7 +225,7 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~XM Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        XM_latch xm_latch(instr_M, O_fromX, B_fromX, instr_X, X_out, B_fromD, ~clock, reset, XM_en);
+        XM_latch xm_latch(instr_M, O_fromX, B_fromX, instr_X, X_out, B_fromD, ~clock, clear, XM_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- M STAGE --------------------------------------------//
@@ -233,7 +250,7 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~MW Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        MW_latch mw_latch(instr_W, O_fromM, D_fromM, instr_M, O_fromX, q_dmem, ~clock, reset, MW_en);
+        MW_latch mw_latch(instr_W, O_fromM, D_fromM, instr_M, O_fromX, q_dmem, ~clock, clear, MW_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- W STAGE --------------------------------------------//

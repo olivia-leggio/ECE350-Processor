@@ -43,3 +43,4 @@
 ./MW_latch.v
 ./normal_stall.v
 ./check_readwrite.v
+./decode_F.v
