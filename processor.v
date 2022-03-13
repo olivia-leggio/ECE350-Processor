@@ -102,7 +102,11 @@ module processor(
         adder32 PCplusOne(PC_plus_one, INE_F, ILT_F, OVF_F, PC_F, 32'b00000000000000000000000000000001, 1'b0);
         
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ PC Register ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        assign new_PC = ctrl_j ? ext_PC : PC_plus_one;
+        wire [31:0] jump_or_normal;
+        assign jump_or_normal = ctrl_j ? ext_PC : PC_plus_one;
+        tristate32 non_jr(new_PC, jump_or_normal, ~ctrl_jr);
+        tristate32 jr_case(new_PC, ALU_B_bypassed, ctrl_jr);
+
         one_register pc_reg(PC_F, new_PC, ~clock, reset, PC_en);
 
         //into imem
@@ -110,13 +114,8 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ F Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        wire control_clear, clear, ctrl_j;
-        decode_F decode_f(ctrl_j, op_X);
-
-        //stores last W stage instr: clears latches one cycle later
-        //clear sent to DX, XM, and MW latches
-        //dffe_ref delayed_clear(control_clear, ctrl_j, ~clock, 1'b1, 1'b0);
-        //assign clear = (reset | control_clear);
+        wire ctrl_j, ctrl_jr;
+        decode_F decode_f(ctrl_j, ctrl_jr, op_X);
 
 
 
@@ -124,7 +123,9 @@ module processor(
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~FD Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         wire[31:0] into_FD;
-        assign into_FD = ctrl_j ? 32'b0 : q_imem;
+        wire do_nop;
+        assign do_nop = (ctrl_j | ctrl_jr);
+        assign into_FD = do_nop ? 32'b0 : q_imem;
         FD_latch fd_latch(PC_D, PC1_D, instr_D, PC_F, PC_plus_one, into_FD, ~clock, reset, FD_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
@@ -173,7 +174,7 @@ module processor(
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~DX Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         wire[31:0] into_DX;
-        assign into_DX = ctrl_j ? 32'b0 : instr_into_DX;
+        assign into_DX = do_nop ? 32'b0 : instr_into_DX;
         DX_latch dx_latch(PC_X, PC1_X, instr_X, A_fromD, B_fromD, PC_D, PC1_D, into_DX, A_read, B_read, ~clock, reset, DX_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
