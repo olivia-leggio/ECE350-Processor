@@ -92,7 +92,8 @@ module processor(
         wire [31:0] new_PC;
 
 
-        assign ext_PC[26:0] = targ_D[26:0];
+        //target of jump instruction
+        assign ext_PC[26:0] = targ_X[26:0];
         assign ext_PC[31:27] = 5'b00000;
 
 
@@ -110,7 +111,7 @@ module processor(
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ F Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         wire control_clear, clear, ctrl_j;
-        decode_F decode_f(ctrl_j, op_D);
+        decode_F decode_f(ctrl_j, op_X);
 
         //stores last W stage instr: clears latches one cycle later
         //clear sent to DX, XM, and MW latches
@@ -160,7 +161,7 @@ module processor(
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ D Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         //writeback and ctrl_writeEnable handled in W stage
         wire ctrl_readB;
-        decode_D decode_d(ctrl_readB, op_D);
+        decode_D decode_d(ctrl_readB, op_X);
 
         //stall NOP insert
         wire [31:0] instr_into_DX;
@@ -171,7 +172,9 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~DX Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        DX_latch dx_latch(PC_X, PC1_X, instr_X, A_fromD, B_fromD, PC_D, PC1_D, instr_into_DX, A_read, B_read, ~clock, reset, DX_en);
+        wire[31:0] into_DX;
+        assign into_DX = ctrl_j ? 32'b0 : instr_into_DX;
+        DX_latch dx_latch(PC_X, PC1_X, instr_X, A_fromD, B_fromD, PC_D, PC1_D, into_DX, A_read, B_read, ~clock, reset, DX_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- X STAGE --------------------------------------------//
