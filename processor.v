@@ -122,12 +122,12 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~FD Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        FD_latch fd_latch(PC_D, instr_D, PC_F, q_imem, ~clock, reset, FD_en);
+        FD_latch fd_latch(PC_D, PC1_D, instr_D, PC_F, PC_plus_one, q_imem, ~clock, reset, FD_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- D STAGE --------------------------------------------//
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        wire [31:0] PC_D, instr_D;
+        wire [31:0] PC_D, PC1_D, instr_D;
         wire [4:0] op_D, rd_D, rs_D, rt_D, shamt_D, ALU_D;
         wire [31:0] imm_D;
         wire [26:0] targ_D; 
@@ -138,7 +138,15 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~Data into Regfile~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        assign ctrl_writeReg[4:0] = ctrl_setx ? 5'b11110 : rd_W[4:0];
+        wire [1:0] wreg_sel;
+        assign wreg_sel[0] = ctrl_setx;
+        assign wreg_sel[1] = ctrl_jal;
+        fivebit_mux4 fb_mux4(ctrl_writeReg, rd_W, 5'b11110, 5'b11111, 5'b11111, wreg_sel);
+            //00 = no setx or jal = write to rd from W stage
+            //01 = setx = write to $30
+            //10 = jal = write to $31
+            //11 = should not be possible = write to $31
+
         assign ctrl_readRegA[4:0] = rs_D[4:0];
         //mux to choose between rt and rd
         assign ctrl_readRegB[4:0] = ctrl_readB ? rd_D[4:0] : rt_D[4:0];
@@ -161,12 +169,12 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~DX Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        DX_latch dx_latch(PC_X, instr_X, A_fromD, B_fromD, PC_D, instr_into_DX, A_read, B_read, ~clock, reset, DX_en);
+        DX_latch dx_latch(PC_X, PC1_X, instr_X, A_fromD, B_fromD, PC_D, PC1_D, instr_into_DX, A_read, B_read, ~clock, reset, DX_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- X STAGE --------------------------------------------//
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        wire [31:0] PC_X, instr_X;
+        wire [31:0] PC_X, PC1_X, instr_X;
         wire [4:0] op_X, rd_X, rs_X, rt_X, shamt_X, ALU_X;
         wire [31:0] imm_X;
         wire [26:0] targ_X;
@@ -225,12 +233,12 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~XM Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        XM_latch xm_latch(instr_M, O_fromX, B_fromX, instr_X, X_out, B_fromD, ~clock, reset, XM_en);
+        XM_latch xm_latch(PC_M, PC1_M, instr_M, O_fromX, B_fromX, PC_X, PC1_X, instr_X, X_out, B_fromD, ~clock, reset, XM_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- M STAGE --------------------------------------------//
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        wire [31:0] PC_M, instr_M;
+        wire [31:0] PC_M, PC1_M, instr_M;
         wire [4:0] op_M, rd_M, rs_M, rt_M, shamt_M, ALU_M;
         wire [31:0] imm_M;
         wire [26:0] targ_M;
@@ -250,31 +258,39 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~MW Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        MW_latch mw_latch(instr_W, O_fromM, D_fromM, instr_M, O_fromX, q_dmem, ~clock, reset, MW_en);
+        MW_latch mw_latch(PC_W, PC1_W, instr_W, O_fromM, D_fromM, PC_M, PC1_M, instr_M, O_fromX, q_dmem, ~clock, reset, MW_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- W STAGE --------------------------------------------//
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        wire [31:0] PC_W, instr_W;
+        wire [31:0] PC_W, PC1_W, instr_W;
         wire [4:0] op_W, rd_W, rs_W, rt_W, shamt_W, ALU_W;
         wire [31:0] imm_W;
         wire [26:0] targ_W;
 
         wire[31:0] O_fromM, D_fromM;
         wire [31:0] writeback, arith_writeback, ext_targ_W;
-        wire ctrl_writeback, ctrl_setx;
+        wire ctrl_writeback, ctrl_setx, ctrl_jal;
 
         instr_split split_W(op_W, rd_W, rs_W, rt_W, shamt_W, ALU_W, imm_W, targ_W, instr_W);
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ W Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        decode_W decode_w(ctrl_writeEnable, ctrl_writeback, ctrl_setx, op_W);
+        decode_W decode_w(ctrl_writeEnable, ctrl_writeback, ctrl_setx, ctrl_jal, op_W);
 
         assign ext_targ_W[26:0] = targ_W[26:0];
         assign ext_targ_W[31:27] = 5'b00000;
 
         assign arith_writeback[31:0] = ctrl_writeback ? D_fromM : O_fromM;
-        assign writeback[31:0] = ctrl_setx ? ext_targ_W : arith_writeback;
+
+        wire [1:0] writeback_sel;
+        assign writeback_sel[0] = ctrl_setx;
+        assign writeback_sel[1] = ctrl_jal;
+        mux4 writeback_mux(writeback, arith_writeback, ext_targ_W, PC1_W, PC1_W, writeback_sel);
+            //00 = normal arithmetic = write data from M stage
+            //01 = setx = write extended target
+            //10 = jal = write PC+1
+            //11 = shouldn't be possible = write PC+1
 
 
 
