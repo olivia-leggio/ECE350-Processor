@@ -122,7 +122,9 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~FD Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        FD_latch fd_latch(PC_D, PC1_D, instr_D, PC_F, PC_plus_one, q_imem, ~clock, reset, FD_en);
+        wire[31:0] into_FD;
+        assign into_FD = ctrl_j ? 32'b0 : q_imem;
+        FD_latch fd_latch(PC_D, PC1_D, instr_D, PC_F, PC_plus_one, into_FD, ~clock, reset, FD_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- D STAGE --------------------------------------------//
