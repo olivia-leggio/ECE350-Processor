@@ -1,6 +1,6 @@
-module decode_X(ALU_B_ctrl, op_ctrl, is_mult, is_div, op, ALU);
+module decode_X(ALU_B_ctrl, op_ctrl, is_mult, is_div, is_bne, is_blt, op, ALU);
     input [4:0] op, ALU;
-    output ALU_B_ctrl, op_ctrl, is_mult, is_div; //sub_ctrl
+    output ALU_B_ctrl, op_ctrl, is_mult, is_div, is_bne, is_blt; //sub_ctrl
 
     wire addi, basicALU;
     assign addi = (op == 5'b00101);
@@ -11,5 +11,7 @@ module decode_X(ALU_B_ctrl, op_ctrl, is_mult, is_div, op, ALU);
     assign op_ctrl = addi;
     assign is_mult = basicALU & (ALU == 5'b00110);
     assign is_div = basicALU & (ALU == 5'b00111);
+    assign is_bne = (op == 5'b00010);
+    assign is_blt = (op == 5'b00110);
 
 endmodule

@@ -106,7 +106,10 @@ module processor(
         assign jump_or_normal = ctrl_j ? ext_PC : PC_plus_one;
         //tristate32 non_jr(new_PC, jump_or_normal, ~ctrl_jr);
         //tristate32 jr_case(new_PC, ALU_B_bypassed, ctrl_jr);
-        assign new_PC = ctrl_jr ? ALU_B_bypassed : jump_or_normal;
+        //tristate32 branch_case(new_PC, branch_PC, ctrl_branch);
+        wire [31:0] jr_PC;
+        assign jr_PC = ctrl_jr ? ALU_B_bypassed : jump_or_normal;
+        assign new_PC = ctrl_branch ? branch_PC :jr_PC;
 
         one_register pc_reg(PC_F, new_PC, ~clock, reset, PC_en);
 
@@ -122,10 +125,15 @@ module processor(
 
 
 
+
+
+
+
+
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~FD Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         wire[31:0] into_FD;
         wire do_nop;
-        assign do_nop = (ctrl_j | ctrl_jr);
+        assign do_nop = (ctrl_j | ctrl_jr | ctrl_branch); //inserts NOP when jumping or branching, extends to DX latch
         assign into_FD = do_nop ? 32'b0 : q_imem;
         FD_latch fd_latch(PC_D, PC1_D, instr_D, PC_F, PC_plus_one, into_FD, ~clock, reset, FD_en);
 
@@ -173,6 +181,12 @@ module processor(
 
 
 
+
+
+
+
+
+
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~DX Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         wire[31:0] into_DX;
         assign into_DX = do_nop ? 32'b0 : instr_into_DX;
@@ -194,8 +208,8 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ X Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        wire ALU_B_ctrl, op_ctrl, is_mult, is_div;
-        decode_X decode_x(ALU_B_ctrl, op_ctrl, is_mult, is_div, op_X, ALU_X);
+        wire ALU_B_ctrl, op_ctrl, is_mult, is_div, is_bne, is_blt;
+        decode_X decode_x(ALU_B_ctrl, op_ctrl, is_mult, is_div, is_bne, is_blt, op_X, ALU_X);
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ALU ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
@@ -203,8 +217,17 @@ module processor(
 
         wire INE, ILT, OVF;
         wire [4:0] into_ALU_op;
+        wire [1:0] ALU_op_sel;
+            assign ALU_op_sel[0] = op_ctrl;
+            assign ALU_op_sel[1] = ctrl_branch;
 
-        assign into_ALU_op = op_ctrl ? 5'b00000 : ALU_X;
+        //assign into_ALU_op = op_ctrl ? 5'b00000 : ALU_X;
+        fivebit_mux4 ALUop_mux(into_ALU_op, ALU_X, 5'b00000, 5'b00001, 5'b00001, ALU_op_sel);
+            //00 = take the ALU op from the DX latch
+            //01 = op_ctrl on = put in 00000 for addi instruction
+            //10 = ctrl_branch on = put in 00001 for subtraction to compare rs to rd
+            //11 = should not be possible
+        
         alu ALU(into_ALU_A, into_ALU_B, into_ALU_op, shamt_X, ALU_out, INE, ILT, OVF);
         
 
@@ -238,6 +261,33 @@ module processor(
 
 
 
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ BRANCHING ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+        wire [31:0] branch_PC; //PC+1+extended immediate
+        wire b_ine, b_ilt, b_ovf;
+        adder32 branc_add(branch_PC, b_ine, b_ilt, b_ovf, PC_X, imm_X, 1'b1);
+
+        wire branch_ILT, branch_INE;  //detects branch conditions; less than and not equal
+        assign branch_INE = INE;
+        assign branch_ILT = (~ILT & INE); //ALU ILT is rs < rd, branch needs rd < rs
+
+        wire do_bne, do_blt;  //op code and condition match up
+        assign do_bne = (is_bne & branch_INE);
+        assign do_blt = (is_blt & branch_ILT);
+
+        wire ctrl_branch;  //either branch taken
+        assign ctrl_branch = (do_bne | do_blt); 
+            //ctrl_branch used in X stage to make ALU subtract
+            //ctrl_branch used in F stage as select bit for PC
+            //ctrl_branch used in D stage and X stage for inserting NOP
+        
+
+
+
+
+
+
+
+
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~XM Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         XM_latch xm_latch(PC_M, PC1_M, instr_M, O_fromX, B_fromX, PC_X, PC1_X, instr_X, X_out, ALU_B_bypassed, ~clock, reset, XM_en);
@@ -258,6 +308,14 @@ module processor(
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ M Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         assign wren = (op_M == 5'b00111);
         assign address_dmem = O_fromX;
+
+
+
+
+
+
+
+
 
 
 
@@ -298,6 +356,10 @@ module processor(
             //01 = setx = write extended target
             //10 = jal = write PC+1
             //11 = shouldn't be possible = write PC+1
+
+
+
+
 
 
 
@@ -359,11 +421,6 @@ module processor(
         assign XM_en = ~multdiv_stall;
         assign MW_en = ~multdiv_stall;
 
-
-        //temp, remove when multdiv stall implemented
-        //assign DX_en = 1'b1;
-        //assign XM_en = 1'b1;
-        //assign MW_en = 1'b1;
 
 	/* END CODE */
 
