@@ -240,7 +240,7 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~XM Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        XM_latch xm_latch(PC_M, PC1_M, instr_M, O_fromX, B_fromX, PC_X, PC1_X, instr_X, X_out, B_fromD, ~clock, reset, XM_en);
+        XM_latch xm_latch(PC_M, PC1_M, instr_M, O_fromX, B_fromX, PC_X, PC1_X, instr_X, X_out, ALU_B_bypassed, ~clock, reset, XM_en);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //-------------------------------------------- M STAGE --------------------------------------------//
