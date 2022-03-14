@@ -104,8 +104,9 @@ module processor(
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ PC Register ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         wire [31:0] jump_or_normal;
         assign jump_or_normal = ctrl_j ? ext_PC : PC_plus_one;
-        tristate32 non_jr(new_PC, jump_or_normal, ~ctrl_jr);
-        tristate32 jr_case(new_PC, ALU_B_bypassed, ctrl_jr);
+        //tristate32 non_jr(new_PC, jump_or_normal, ~ctrl_jr);
+        //tristate32 jr_case(new_PC, ALU_B_bypassed, ctrl_jr);
+        assign new_PC = ctrl_jr ? ALU_B_bypassed : jump_or_normal;
 
         one_register pc_reg(PC_F, new_PC, ~clock, reset, PC_en);
 
@@ -162,7 +163,7 @@ module processor(
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ D Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         //writeback and ctrl_writeEnable handled in W stage
         wire ctrl_readB;
-        decode_D decode_d(ctrl_readB, op_X);
+        decode_D decode_d(ctrl_readB, op_D);
 
         //stall NOP insert
         wire [31:0] instr_into_DX;
