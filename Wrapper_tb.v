@@ -177,6 +177,14 @@ module Wrapper_tb #(parameter FILE = "nop");
 			
 			// Every rising edge, write to the actual file
 			@(posedge clock);
+
+
+
+			//$display("clock: %0d", clock);
+
+
+
+
 			if (rwe && rd != 0) begin
 				$fdisplay(actFile, "Cycle %3d: Wrote %0d into register %0d", cycles, rData, rd);
 			end

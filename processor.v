@@ -102,14 +102,12 @@ module processor(
         adder32 PCplusOne(PC_plus_one, INE_F, ILT_F, OVF_F, PC_F, 32'b00000000000000000000000000000001, 1'b0);
         
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ PC Register ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        wire [31:0] jump_or_normal;
-        assign jump_or_normal = ctrl_j ? ext_PC : PC_plus_one;
-        //tristate32 non_jr(new_PC, jump_or_normal, ~ctrl_jr);
-        //tristate32 jr_case(new_PC, ALU_B_bypassed, ctrl_jr);
-        //tristate32 branch_case(new_PC, branch_PC, ctrl_branch);
-        wire [31:0] jr_PC;
-        assign jr_PC = ctrl_jr ? ALU_B_bypassed : jump_or_normal;
-        assign new_PC = ctrl_branch ? branch_PC :jr_PC;
+        wire do_normal;
+        assign do_normal = ~(ctrl_j | ctrl_jr | ctrl_branch);
+        tristate32 normal_PC(new_PC, PC_plus_one, do_normal);
+        tristate32 j_or_jal(new_PC, ext_PC, ctrl_j);
+        tristate32 jr_case(new_PC, ALU_B_bypassed, ctrl_jr);
+        tristate32 branch_case(new_PC, branch_PC, ctrl_branch);
 
         one_register pc_reg(PC_F, new_PC, ~clock, reset, PC_en);
 
