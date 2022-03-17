@@ -102,12 +102,13 @@ module processor(
         adder32 PCplusOne(PC_plus_one, INE_F, ILT_F, OVF_F, PC_F, 32'b00000000000000000000000000000001, 1'b0);
         
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ PC Register ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        wire do_normal;
-        assign do_normal = ~(ctrl_j | ctrl_jr | ctrl_branch);
-        tristate32 normal_PC(new_PC, PC_plus_one, do_normal);
-        tristate32 j_or_jal(new_PC, ext_PC, ctrl_j);
-        tristate32 jr_case(new_PC, ALU_B_bypassed, ctrl_jr);
-        tristate32 branch_case(new_PC, branch_PC, ctrl_branch);
+        wire do_normal, jump_bex;
+        assign do_normal = ~(ctrl_j | ctrl_jr | ctrl_branch | ctrl_bex);
+        assign jump_bex = (ctrl_j | ctrl_bex);
+        tristate32 normal_PC(new_PC, PC_plus_one, do_normal);               //PC = PC+1
+        tristate32 j_jal_bex(new_PC, ext_PC, jump_bex);                     //PC = targ_X
+        tristate32 jr_case(new_PC, ALU_B_bypassed, ctrl_jr);                //PC = PC = rd_X
+        tristate32 branch_case(new_PC, branch_PC, ctrl_branch);             //PC = PC + 1 + imm_X
 
         one_register pc_reg(PC_F, new_PC, ~clock, reset, PC_en);
 
@@ -131,7 +132,7 @@ module processor(
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~FD Latch~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         wire[31:0] into_FD;
         wire do_nop;
-        assign do_nop = (ctrl_j | ctrl_jr | ctrl_branch); //inserts NOP when jumping or branching, extends to DX latch
+        assign do_nop = (ctrl_j | ctrl_jr | ctrl_branch | ctrl_bex); //inserts NOP when jumping or branching, extends to DX latch
         assign into_FD = do_nop ? 32'b0 : q_imem;
         FD_latch fd_latch(PC_D, PC1_D, instr_D, PC_F, PC_plus_one, into_FD, ~clock, reset, FD_en);
 
@@ -158,9 +159,20 @@ module processor(
             //10 = jal = write to $31
             //11 = should not be possible = write to $31
 
-        assign ctrl_readRegA[4:0] = rs_D[4:0];
-        //mux to choose between rt and rd
-        assign ctrl_readRegB[4:0] = ctrl_readB ? rd_D[4:0] : rt_D[4:0];
+        //mux to choose between rs and $r30 ($rstatus)
+        assign ctrl_readRegA[4:0] = is_bex_D ? 5'b11110 : rs_D[4:0];
+
+        //mux to choose between rt, rd, and $r0 (on bex)
+        wire [1:0] readB_sel;
+        assign readB_sel[0] = ctrl_readB;
+        assign readB_sel[1] = is_bex_D;
+        fivebit_mux4 readBmux(ctrl_readRegB, rt_D, rd_D, 5'b00000, 5'b00000, readB_sel);
+            //00 = read rt
+            //01 = read rd on ctrl_readB signal
+            //10 = read $r0 on bex
+            //11 = should not be possible = read $r0
+
+        //read and write to regfile module
         assign A_read[31:0] = data_readRegA[31:0];
         assign B_read[31:0] = data_readRegB[31:0];
         assign data_writeReg[31:0] = writeback[31:0];
@@ -168,8 +180,8 @@ module processor(
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ D Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         //writeback and ctrl_writeEnable handled in W stage
-        wire ctrl_readB;
-        decode_D decode_d(ctrl_readB, op_D);
+        wire ctrl_readB, is_bex_D;
+        decode_D decode_d(ctrl_readB, is_bex_D, op_D);
 
         //stall NOP insert
         wire [31:0] instr_into_DX;
@@ -206,8 +218,8 @@ module processor(
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ X Control ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-        wire ALU_B_ctrl, op_ctrl, is_mult, is_div, is_bne, is_blt;
-        decode_X decode_x(ALU_B_ctrl, op_ctrl, is_mult, is_div, is_bne, is_blt, op_X, ALU_X);
+        wire ALU_B_ctrl, op_ctrl, is_mult, is_div, is_bne, is_blt, is_bex_X;
+        decode_X decode_x(ALU_B_ctrl, op_ctrl, is_mult, is_div, is_bne, is_blt, is_bex_X, op_X, ALU_X);
 
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ALU ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
@@ -217,13 +229,13 @@ module processor(
         wire [4:0] into_ALU_op;
         wire [1:0] ALU_op_sel;
             assign ALU_op_sel[0] = op_ctrl;
-            assign ALU_op_sel[1] = ctrl_branch;
+            assign ALU_op_sel[1] = (ctrl_branch | is_bex_X);
 
         //assign into_ALU_op = op_ctrl ? 5'b00000 : ALU_X;
         fivebit_mux4 ALUop_mux(into_ALU_op, ALU_X, 5'b00000, 5'b00001, 5'b00001, ALU_op_sel);
             //00 = take the ALU op from the DX latch
             //01 = op_ctrl on = put in 00000 for addi instruction
-            //10 = ctrl_branch on = put in 00001 for subtraction to compare rs to rd
+            //10 = ctrl_branch or is_bex_X on = put in 00001 for subtraction to compare rs to rd
             //11 = should not be possible
         
         alu ALU(into_ALU_A, into_ALU_B, into_ALU_op, shamt_X, ALU_out, INE, ILT, OVF);
@@ -279,6 +291,9 @@ module processor(
             //ctrl_branch used in D stage and X stage for inserting NOP
         
 
+        //bex op code and INE signal
+        wire ctrl_bex;
+        assign ctrl_bex = (is_bex_X & INE);
 
 
 
