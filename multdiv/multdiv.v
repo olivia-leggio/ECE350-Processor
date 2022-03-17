@@ -34,7 +34,10 @@ module multdiv(
     tristate1 multrdy(data_resultRDY, mult_rdy, was_MULT);
     tristate1 divrdy(data_resultRDY, div_rdy, was_DIV);
 
-    tristate1 multex(data_exception, mult_ex, was_MULT);
-    tristate1 divex(data_exception, div_ex, was_DIV);
+    wire d_exception;
+    tristate1 multex(d_exception, mult_ex, was_MULT);
+    tristate1 divex(d_exception, div_ex, was_DIV);
+
+    assign data_exception = (d_exception & data_resultRDY);
 
 endmodule

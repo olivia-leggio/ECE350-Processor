@@ -1,5 +1,5 @@
-module normal_stall(PC_en, FD_en, ctrl_DX_instr, op_X, op_D, rs_D, rt_D, rd_X);
-    output PC_en, FD_en, ctrl_DX_instr;
+module normal_stall(do_stall, op_X, op_D, rs_D, rt_D, rd_X);
+    output do_stall;
     input [4:0] op_X, op_D, rs_D, rt_D, rd_X;
 
     wire do_stall;
@@ -11,9 +11,5 @@ module normal_stall(PC_en, FD_en, ctrl_DX_instr, op_X, op_D, rs_D, rt_D, rd_X);
     assign not_store = (op_D != 5'b00111);
 
     assign do_stall = is_load && (check_rs || (check_rt && not_store));
-
-    assign PC_en = ~do_stall;
-    assign FD_en = ~do_stall;
-    assign ctrl_DX_instr = do_stall;
 
 endmodule

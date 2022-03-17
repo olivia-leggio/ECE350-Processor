@@ -185,7 +185,11 @@ module processor(
 
         //stall NOP insert
         wire [31:0] instr_into_DX;
-        assign instr_into_DX = ctrl_DX_instr ? 32'b0 : instr_D;
+        //assign instr_into_DX = ctrl_DX_instr ? 32'b0 : instr_D;
+
+        tristate32 instr1(instr_into_DX, instr_D, ~short_stall);
+        tristate32 instr2(instr_into_DX, 32'b0, ctrl_DX_instr);
+        tristate32 instr3(instr_into_DX, setx_insert, ctrl_exc);
 
 
 
@@ -263,6 +267,22 @@ module processor(
         multdiv multiplierdivider(md_A, md_B, ctrl_mult, ctrl_div, clock, multdiv_result, multdiv_exception, multdiv_RDY);
 
 
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~ EXCEPTION LOGIC ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+        wire add_exc, addi_exc, sub_exc, mul_exc, div_exc;
+        exception_checker check_exc(add_exc, addi_exc, sub_exc, mul_exc, div_exc, op_X, ALU_X, OVF, multdiv_exception);
+        
+        //on if any exception is found
+        wire ctrl_exc = (add_exc | addi_exc | sub_exc | mul_exc | div_exc);
+
+        //setx to insert
+        wire [31:0] setx_insert;
+        tristate32  exc_add(setx_insert, 32'b10101000000000000000000000000001, add_exc);
+        tristate32 exc_addi(setx_insert, 32'b10101000000000000000000000000010, addi_exc);
+        tristate32  exc_sub(setx_insert, 32'b10101000000000000000000000000011, sub_exc);
+        tristate32  exc_mul(setx_insert, 32'b10101000000000000000000000000100, mul_exc);
+        tristate32  exc_div(setx_insert, 32'b10101000000000000000000000000101, div_exc);
+
+
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~ X STAGE OUTPUT ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
         wire [31:0] X_out;
 
@@ -294,6 +314,9 @@ module processor(
         //bex op code and INE signal
         wire ctrl_bex;
         assign ctrl_bex = (is_bex_X & INE);
+
+
+
 
 
 
@@ -378,9 +401,12 @@ module processor(
 
 
 
+
+
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
     //------------------------------------ BYPASS AND STALL LOGIC -------------------------------------//
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+
         //----------BYPASS-------------
         wire A_reads_rs;
         wire B_reads_rt;
@@ -422,17 +448,47 @@ module processor(
         wire PC_en, FD_en, DX_en, XM_en, MW_en;
         wire ctrl_DX_instr;
 
-        normal_stall staller(PC_en, FD_en, ctrl_DX_instr, op_X, op_D, rs_D, rt_D, rd_X);
+        wire normal_stall;
+        assign ctrl_DX_instr = normal_stall;
+        normal_stall staller(normal_stall, op_X, op_D, rs_D, rt_D, rd_X);
 
         //multdiv stall
         wire multdiv_stall;
         dffe_ref md_storer(multdiv_stall, is_multdiv, clock, 1'b1, multdiv_RDY);
 
-        assign PC_en = ~multdiv_stall;
-        assign FD_en = ~multdiv_stall;
-        assign DX_en = ~multdiv_stall;
-        assign XM_en = ~multdiv_stall;
-        assign MW_en = ~multdiv_stall;
+        //selectors for enables:
+            //normal_stall = load/addi case          stall PC and FD
+            //multdiv_stall = multicycle multdiv     stall PC and FD
+            //ctrl_exc = stall to insert setx        stall all latches
+            //no_stall = no other stalls on          enable all latches
+        
+        //if no other stalls on
+        wire no_stall = ~(normal_stall | multdiv_stall | ctrl_exc);
+        //stall just PC and FD latches
+        wire short_stall = ((normal_stall | ctrl_exc) & ~multdiv_stall);
+
+
+        //---------PC ENABLE-----------
+        tristate1 PC1(PC_en, 1'b1, no_stall);         //no stall
+        tristate1 PC2(PC_en, 1'b0, short_stall);      //load or exception stall
+        tristate1 PC3(PC_en, 1'b0, multdiv_stall);    //multdiv_stall
+
+        //---------FD ENABLE-----------
+        tristate1 FD1(FD_en, 1'b1, no_stall);         //no stall
+        tristate1 FD2(FD_en, 1'b0, short_stall);      //load or exception stall
+        tristate1 FD3(FD_en, 1'b0, multdiv_stall);    //multdiv_stall
+
+        //---------DX ENABLE-----------
+        tristate1 DX1(DX_en, 1'b1, ~multdiv_stall);   //no stall
+        tristate1 DX2(DX_en, 1'b0,  multdiv_stall);   //multdiv_stall
+
+        //---------XM ENABLE-----------
+        tristate1 XM1(XM_en, 1'b1, ~multdiv_stall);   //no stall
+        tristate1 XM2(XM_en, 1'b0,  multdiv_stall);   //multdiv_stall
+
+        //---------MW ENABLE-----------
+        tristate1 MW1(MW_en, 1'b1, ~multdiv_stall);   //no stall
+        tristate1 MW2(MW_en, 1'b0,  multdiv_stall);   //multdiv_stall
 
 
 	/* END CODE */

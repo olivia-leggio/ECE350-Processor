@@ -45,3 +45,4 @@
 ./check_readwrite.v
 ./decode_F.v
 ./fivebit_mux4.v
+./exception_checker.v
