@@ -427,9 +427,48 @@ module processor(
 
         //----------ALU A BYPASSING-------------
         wire [1:0] ALU_A_select;
+        wire [31:0] A_stage_one;
         assign ALU_A_select[0] = (rs_X == rd_W) & A_reads_rs & W_writes_rd & W_nonzero & rs_nonzero;
         assign ALU_A_select[1] = (rs_X == rd_M) & A_reads_rs & M_writes_rd & M_nonzero & rs_nonzero;
-        mux4 A_bypass(into_ALU_A, A_fromD, writeback, O_fromX, O_fromX, ALU_A_select);
+        mux4 A_bypass(A_stage_one, A_fromD, writeback, O_fromX, O_fromX, ALU_A_select);
+
+        //bypassing exceptions
+        //setx to bex
+        wire M_setx, W_setx, no_setx;
+        assign M_setx = (op_M == 5'b10101);
+        assign W_setx = ((op_W == 5'b10101) & ~M_setx);
+        assign no_setx = ~(M_bsetx | W_bsetx);
+
+        wire [31:0] ext_targ_M;
+        assign ext_targ_M[26:0] = targ_M[26:0];
+        assign ext_targ_M[31:27] = 5'b00000;
+
+        wire M_bsetx, W_bsetx;  //bex in X stage or rs_X reads $30
+        assign M_bsetx = (M_setx & (is_bex_X | rs_reads30));
+        assign W_bsetx = (W_setx & (is_bex_X | rs_reads30));
+
+        tristate32 A_one(into_ALU_A, A_stage_one, no_setx);
+        tristate32 Msetx(into_ALU_A, ext_targ_M, M_bsetx);
+        tristate32 Wsetx(into_ALU_A, ext_targ_W, W_bsetx);
+
+
+        //setx to $30 read
+        wire rs30, rt30, rd30, rs_reads30, rt_reads30, rd_reads30;
+        assign rs30 = (rs_X == 5'b11110);
+        assign rt30 = (rt_X == 5'b11110);
+        assign rd30 = (rd_X == 5'b11110);
+
+        assign rs_reads30 = (rs30 & A_reads_rs);
+        assign rt_reads30 = (rt30 & B_reads_rt);
+        assign rd_reads30 = (rd30 & B_reads_rd);
+
+        wire M_setx_bp, W_setx_bp, B_reads_30;
+        assign B_reads_30 = (rt_reads30 | rd_reads30);
+        assign M_setx_bp = (M_setx & B_reads_30);
+        assign W_setx_bp = (W_setx & B_reads_30);
+
+
+
         
         //----------ALU B BYPASSING-------------
         wire [31:0] ALU_B_bypassed, B_stage_one;
@@ -443,11 +482,13 @@ module processor(
         assign rd31 = (rd_X == 5'b11111);
         assign M_jal = (rd31 & (op_M == 5'b00011));
         assign W_jal = (rd31 & (op_W == 5'b00011) & ~M_jal);
-        assign no_jal = ~(M_jal | W_jal);
+        assign no_jal_setx_B = ~(M_jal | W_jal | M_setx_bp | W_setx_bp);
 
-        tristate32 B_one(ALU_B_bypassed, B_stage_one, no_jal);
+        tristate32 B_one(ALU_B_bypassed, B_stage_one, no_jal_setx_B);
         tristate32 Mjal(ALU_B_bypassed, PC1_M, M_jal);
         tristate32 Wjal(ALU_B_bypassed, PC1_W, W_jal);
+        tristate32 Msetxbp(ALU_B_bypassed, ext_targ_M, M_setx_bp);
+        tristate32 Wsetxbp(ALU_B_bypassed, ext_targ_W, W_setx_bp);
         
 
         //----------DATA BYPASSING--------------
