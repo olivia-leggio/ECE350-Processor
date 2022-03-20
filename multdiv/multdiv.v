@@ -31,12 +31,16 @@ module multdiv(
     tristate32 domult(data_result, mult_out, was_MULT);
     tristate32 dodiv(data_result, div_out, was_DIV);
 
+    wire neither_ready = ~(mult_rdy | div_rdy);
     tristate1 multrdy(data_resultRDY, mult_rdy, was_MULT);
     tristate1 divrdy(data_resultRDY, div_rdy, was_DIV);
+    tristate1 nrdy(data_resultRDY, 1'b0, neither_ready);
 
     wire d_exception;
+    wire neither_exc = ~(mult_ex | div_ex);
     tristate1 multex(d_exception, mult_ex, was_MULT);
     tristate1 divex(d_exception, div_ex, was_DIV);
+    tristate1 nexc(d_exception, 1'b0, neither_exc);
 
     assign data_exception = (d_exception & data_resultRDY);
 
