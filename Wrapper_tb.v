@@ -175,6 +175,10 @@ module Wrapper_tb #(parameter FILE = "nop");
 		// Run for the number of cycles specified 
 		for (cycles = 0; cycles < num_cycles; cycles = cycles + 1) begin
 			
+			$display("cycle: %0d, fetching: %0b at address %0d", cycles, instData, instAddr);
+
+
+
 			// Every rising edge, write to the actual file
 			@(posedge clock);
 
@@ -186,6 +190,7 @@ module Wrapper_tb #(parameter FILE = "nop");
 
 
 			if (rwe && rd != 0) begin
+				$display("logging register write");
 				$fdisplay(actFile, "Cycle %3d: Wrote %0d into register %0d", cycles, rData, rd);
 			end
 		end

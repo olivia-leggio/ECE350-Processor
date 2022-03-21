@@ -273,10 +273,10 @@ module processor(
         wire add_exc, addi_exc, sub_exc, mul_exc, div_exc;
         exception_checker check_exc(add_exc, addi_exc, sub_exc, mul_exc, div_exc, op_X, ALU_X, OVF, multdiv_exception);
         
-        //on if any exception is found
+        //1 if any exception is found
         wire ctrl_exc = (add_exc | addi_exc | sub_exc | mul_exc | div_exc);
 
-        //setx to insert
+        //setx instr to insert
         wire [31:0] setx_insert;
         tristate32  exc_add(setx_insert, 32'b10101000000000000000000000000001, add_exc);
         tristate32 exc_addi(setx_insert, 32'b10101000000000000000000000000010, addi_exc);
@@ -476,6 +476,11 @@ module processor(
         assign ALU_B_select[0] = (((rt_X == rd_W) & B_reads_rt) | ((rd_X == rd_W) & B_reads_rd)) & W_writes_rd & W_nonzero;
         assign ALU_B_select[1] = (((rt_X == rd_M) & B_reads_rt) | ((rd_X == rd_M) & B_reads_rd)) & M_writes_rd & M_nonzero;
         mux4 B_bypass(B_stage_one, B_fromD, writeback, O_fromX, O_fromX, ALU_B_select);
+            //00 = no bypassing case = use the B read from D stage
+            //01 = WX bypass, use the W to regfile writeback value as the B in X
+            //10 = MX bypass, use the ALU output that is now in M stage as the B in X
+            //11 = if both M and W bypass to X, take the MX bypass value because it is more recent
+                //useless case where M stage instr overwrites register written to in W stage instr
 
         //jal to jr
         wire M_jal, W_jal, no_jal, rd31;
